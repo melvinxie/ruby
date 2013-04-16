@@ -7,11 +7,9 @@ RubyVM::InstructionSequence.compile_option = {
 
 # RubyVM::InstructionSequence.new(<<-EOF).eval
 
-require 'prime'
-
 def memo_proc(&proc)
   already_run = false
-  result = false
+  result = nil
   lambda do
     if already_run
       result
@@ -24,9 +22,9 @@ def memo_proc(&proc)
 end
 
 class Stream
-  def initialize(first, &rest)
+  def initialize(first=nil, &rest)
     @first = first
-    @rest = memo_proc(&rest)
+    @rest = block_given? ? memo_proc(&rest) : lambda {}
   end
 
   attr_reader :first
@@ -35,67 +33,78 @@ class Stream
     @rest.call
   end
 
+  def empty?
+    first.nil?
+  end
+
   def at(n)
-    if n == 0
+    if empty?
+      nil
+    elsif n == 0
       first
     else
       rest.at(n - 1)
     end
   end
 
-  def select(&pred)
-    if pred.call(first)
-      Stream.new(first) { rest.select(&pred) }
-    else
-      rest.select(&pred)
-    end
-  end
-
-  def map(&proc)
-    Stream.new(proc.call(first)) do
-      if rest == []
-        []
-      else
-        rest.map(&proc)
-      end
-    end
-  end
-
-  def each(&proc)
-    proc.call(first)
-    rest.each(&proc)
-  end
-
-  def reduce(initial, &proc)
-    rest.reduce(proc.call(initial, first), &proc)
+  def display
+    each { |e| puts e }
   end
 
   def drop(n)
-    if n < 1
+    if empty? or n < 1
       self
     else
       rest.drop(n - 1)
     end
   end
 
-  def take(n)
-    if n < 1
-      []
-    elsif n == 1
-      Stream.new(first) { [] }
+  def each(&proc)
+    unless empty?
+      proc.call(first)
+      rest.each(&proc)
+    end
+    self
+  end
+
+  def map(&proc)
+    if empty?
+      self
     else
-      Stream.new(first) { rest.take(n - 1) }
+      Stream.new(proc.call(first)) { rest.map(&proc) }
     end
   end
 
-  def display
-    each { |x| puts x }
+  def reduce(initial, &proc)
+    if empty?
+      initial
+    else
+      rest.reduce(proc.call(initial, first), &proc)
+    end
+  end
+
+  def select(&pred)
+    if empty?
+      self
+    elsif pred.call(first)
+      Stream.new(first) { rest.select(&pred) }
+    else
+      rest.select(&pred)
+    end
+  end
+
+  def take(n)
+    if empty? or n < 1
+      Stream.new
+    else
+      Stream.new(first) { rest.take(n - 1) }
+    end
   end
 end
 
 def stream_enumerate_interval(low, high)
   if low > high
-    []
+    Stream.new
   else
     Stream.new(low) { stream_enumerate_interval(low + 1, high) }
   end
@@ -109,35 +118,27 @@ def integers_starting_from(n)
   Stream.new(n) { integers_starting_from(n + 1) }
 end
 
-def integers
-  integers_starting_from(1)
-end
-
 def no_sevens
-  integers.select { |i| i % 7 > 0 }
+  integers_starting_from(1).select { |i| i % 7 > 0 }
 end
 
 def fibgen(a, b)
   Stream.new(a) { fibgen(b, a + b) }
 end
 
-def fibs
-  fibgen(0, 1)
-end
-
 def sieve(stream)
   Stream.new(stream.first) do
-    sieve(stream.rest.select { |x| x % stream.first > 0 })
+    sieve(stream.rest.select { |e| e % stream.first > 0 })
   end
 end
 
-def primes
+def prime_sieve
   sieve(integers_starting_from(2))
 end
 
 def stream_map(*streams, &proc)
-  if streams.first == []
-    []
+  if streams.first.empty?
+    Stream.new
   else
     Stream.new(proc.call(*streams.map(&:first))) do
       stream_map(*streams.map(&:rest), &proc)
@@ -146,35 +147,28 @@ def stream_map(*streams, &proc)
 end
 
 def add_streams(*streams)
-  stream_map(*streams) do |*args|
-    puts '+ ' + args.join(',')
-    args.reduce(&:+)
-  end
+  stream_map(*streams) { |*args| args.reduce(&:+) }
 end
 
 ones = Stream.new(1) { ones }
 
 integers = Stream.new(1) { add_streams(ones, integers) }
 
-fibs = Stream.new(0) do
-  Stream.new(1) do
-    add_streams(fibs.rest, fibs)
-  end
-end
+fibs = Stream.new(0) { Stream.new(1) { add_streams(fibs.rest, fibs) } }
 
-primes = Stream.new(2) { integers_starting_from(3).select(&:prime?) }
-
-def prime?(n)
-  iter = -> (ps) do
-    if ps.first**2 > n
-      true
-    elsif n % ps.first == 0
-      false
-    else
-      iter(ps.rest)
+primes = Stream.new(2) do
+  integers_starting_from(3).select do |n|
+    iter = lambda do |ps|
+      if ps.first**2 > n
+        true
+      elsif n % ps.first == 0
+        false
+      else
+        iter.call(ps.rest)
+      end
     end
+    iter.call(primes)
   end
-  iter(primes)
 end
 
 if __FILE__ == $0
@@ -183,6 +177,6 @@ if __FILE__ == $0
   puts integers.take(10).reduce(0, &:+)
   add_streams(integers.take(10), integers.take(10)).display
   integers.take(10).display
-  fibs.take(6).display
+  fibs.take(2000).display
   primes.take(2000).display
 end
