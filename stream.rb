@@ -102,16 +102,12 @@ class Stream
   end
 end
 
-def stream_enumerate_interval(low, high)
+def enumerate_interval(low, high)
   if low > high
     Stream.new
   else
-    Stream.new(low) { stream_enumerate_interval(low + 1, high) }
+    Stream.new(low) { enumerate_interval(low + 1, high) }
   end
-end
-
-def prime_stream_enumerate_interval(low, high)
-  stream_enumerate_interval(low, high).select(&:prime?)
 end
 
 def integers_starting_from(n)
@@ -156,19 +152,29 @@ integers = Stream.new(1) { add_streams(ones, integers) }
 
 fibs = Stream.new(0) { Stream.new(1) { add_streams(fibs.rest, fibs) } }
 
-primes = Stream.new(2) do
-  integers_starting_from(3).select do |n|
-    iter = lambda do |ps|
-      if ps.first**2 > n
-        true
-      elsif n % ps.first == 0
-        false
-      else
-        iter.call(ps.rest)
-      end
+def iter_primes(primes, n)
+  iter = lambda do |ps|
+    if ps.first**2 > n
+      true
+    elsif n % ps.first == 0
+      false
+    else
+      iter.call(ps.rest)
     end
-    iter.call(primes)
   end
+  iter.call(primes)
+end
+
+primes = Stream.new(2) do
+  integers_starting_from(3).select { |n| iter_primes(primes, n) }
+end
+
+is_prime = lambda do |n|
+  iter_primes(primes, n)
+end
+
+prime_enumerate_interval = lambda do |low, high|
+  enumerate_interval(low, high).select(&is_prime)
 end
 
 if __FILE__ == $0
@@ -179,4 +185,5 @@ if __FILE__ == $0
   integers.take(10).display
   fibs.take(2000).display
   primes.take(2000).display
+  prime_enumerate_interval.call(3, 20).display
 end
