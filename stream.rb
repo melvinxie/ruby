@@ -41,7 +41,7 @@ class Stream
   end
 
   def display
-    each { |e| puts e }
+    each { |x| puts x }
   end
 
   def drop(n)
@@ -67,7 +67,7 @@ class Stream
     end
   end
 
-  def reduce(initial, &proc)
+  def reduce(initial=0, &proc)
     if empty?
       initial
     else
@@ -91,6 +91,15 @@ class Stream
     else
       Stream.new(first) { rest.take(n - 1) }
     end
+  end
+
+  def scale(factor)
+    map { |x| x * factor }
+  end
+
+  def partial_sums(initial=0)
+    partial_sum = initial + first
+    Stream.new(partial_sum) { rest.partial_sums(partial_sum) }
   end
 
   def self.map(*streams, &proc)
