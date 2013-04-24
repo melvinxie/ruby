@@ -98,28 +98,28 @@ def accelerated_sequence(transform, s)
   make_tableau(transform, s).map(&:first)
 end
 
+def pairs(s, t)
+  Stream.new([s.first, t.first]) do
+    Stream.interleave(t.rest.map { |x| [s.first, x] },
+                      pairs(s.rest, t.rest))
+  end
+end
+
 
 no_sevens.take(10).display
 # 1 2 3 4 5 6 8 9 10 11
-
 puts integers.take(10).reduce(&:+)
 # 55
-
 Stream.add(integers.take(10), integers.take(10)).display
 # 2 4 6 8 10 12 14 16 18 20
-
 integers.take(10).display
 # 1 2 3 4 5 6 7 8 9 10
-
 fibs.take(10).display
 # 0 1 1 2 3 5 8 13 21 34
-
 primes.take(10).display
 # 2 3 5 7 11 13 17 19 23 29
-
 prime_enumerate_interval.call(10, 30).display
 # 11 13 17 19 23 29
-
 puts prime_enumerate_interval.call(10000, 40000).reduce(&:+)
 # 73434270
 
@@ -129,17 +129,20 @@ sqrt(2).take(5).display
 # 1.4166666666666665
 # 1.4142156862745097
 # 1.4142135623746899
-
 euler_transform.call(pi_stream).take(5).display
 # 3.166666666666667
 # 3.1333333333333337
 # 3.1452380952380956
 # 3.13968253968254
 # 3.1427128427128435
-
 accelerated_sequence(euler_transform, pi_stream).take(5).display
 # 4.0
 # 3.166666666666667
 # 3.142105263157895
 # 3.141599357319005
 # 3.1415927140337785
+
+pairs(integers, integers).take(5).display
+# [1, 1] [1, 2] [2, 2] [1, 3] [2, 3]
+pairs(integers, integers).select { |i, j| is_prime.call(i + j)}.take(5).display
+# [1, 1] [1, 2] [2, 3] [1, 4] [1, 6]

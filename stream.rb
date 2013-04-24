@@ -115,4 +115,12 @@ class Stream
   def self.add(*streams)
     map(*streams) { |*args| args.reduce(&:+) }
   end
+
+  def self.interleave(s1, s2)
+    if s1.empty?
+      s2
+    else
+      Stream.new(s1.first) { interleave(s2, s1.rest) }
+    end
+  end
 end
