@@ -1,14 +1,14 @@
 #!/usr/bin/env ruby
 
-require './stream'
+require './lazy_stream'
 
 def enumerate_interval(low, high)
-  low > high ? Stream.new :
-               Stream.new(low) { enumerate_interval(low + 1, high) }
+  low > high ? lazy_stream :
+               lazy_stream(low) { enumerate_interval(low + 1, high) }
 end
 
 def integers_starting_from(n)
-  Stream.new(n) { integers_starting_from(n + 1) }
+  lazy_stream(n) { integers_starting_from(n + 1) }
 end
 
 def no_sevens
@@ -16,11 +16,11 @@ def no_sevens
 end
 
 def fibgen(a, b)
-  Stream.new(a) { fibgen(b, a + b) }
+  lazy_stream(a) { fibgen(b, a + b) }
 end
 
 def sieve(stream)
-  Stream.new(stream.first) do
+  lazy_stream(stream.first) do
     sieve(stream.rest.select { |x| x % stream.first > 0 })
   end
 end
@@ -29,13 +29,13 @@ def prime_sieve
   sieve(integers_starting_from(2))
 end
 
-ones = Stream.new(1) { ones }
+ones = lazy_stream(1) { ones }
 
-integers = Stream.new(1) { Stream.add(ones, integers) }
+integers = lazy_stream(1) { LazyStream.add(ones, integers) }
 
-fibs = Stream.new(0) { Stream.new(1) { Stream.add(fibs.rest, fibs) } }
+fibs = lazy_stream(0) { lazy_stream(1) { LazyStream.add(fibs.rest, fibs) } }
 
-@primes = Stream.new(2) { integers_starting_from(3).select(&method(:prime?)) }
+@primes = lazy_stream(2) { integers_starting_from(3).select(&method(:prime?)) }
 
 def prime?(n)
   iter = -> ps do
@@ -59,11 +59,11 @@ def sqrt_improve(guess, x)
 end
 
 def sqrt_stream(x)
-  guesses = Stream.new(1.0) { guesses.map { |guess| sqrt_improve(guess, x) } }
+  guesses = lazy_stream(1.0) { guesses.map { |guess| sqrt_improve(guess, x) } }
 end
 
 def pi_summands(n)
-  Stream.new(1.0 / n) { pi_summands(n + 2).map(&:-@) }
+  lazy_stream(1.0 / n) { pi_summands(n + 2).map(&:-@) }
 end
 
 def pi_stream
@@ -75,11 +75,11 @@ def euler_transform(s)
   s1 = s.at(1)
   s2 = s.at(2)
   first = s2 - ((s2 - s1)**2 / (s0 - 2 * s1 + s2))
-  Stream.new(first) { euler_transform(s.rest) }
+  lazy_stream(first) { euler_transform(s.rest) }
 end
 
 def make_tableau(s, &transform)
-  Stream.new(s) { make_tableau(transform.call(s), &transform) }
+  lazy_stream(s) { make_tableau(transform.call(s), &transform) }
 end
 
 def accelerated_sequence(s, &transform)
@@ -87,14 +87,14 @@ def accelerated_sequence(s, &transform)
 end
 
 def pairs(s, t)
-  Stream.new([s.first, t.first]) do
-    Stream.interleave(t.rest.map { |x| [s.first, x] },
+  lazy_stream([s.first, t.first]) do
+    LazyStream.interleave(t.rest.map { |x| [s.first, x] },
                       pairs(s.rest, t.rest))
   end
 end
 
 def integral(integrand, initial, dt)
-  int = Stream.new(initial) { Stream.add(integrand.scale(dt), int) }
+  int = lazy_stream(initial) { LazyStream.add(integrand.scale(dt), int) }
 end
 
 def solve(f, y0, dt)
@@ -102,7 +102,7 @@ def solve(f, y0, dt)
 end
 
 def random_numbers
-  Stream.new(rand(2**31)) { random_numbers }
+  lazy_stream(rand(2**31)) { random_numbers }
 end
 
 def gcd(a, b)
@@ -115,7 +115,7 @@ end
 
 def monte_carlo(experiments, passed, failed)
   next_try = -> passed, failed do
-    Stream.new(passed.to_f / (passed + failed)) do
+    lazy_stream(passed.to_f / (passed + failed)) do
       monte_carlo(experiments.rest, passed, failed)
     end
   end
@@ -128,11 +128,12 @@ def monte_carlo_pi
 end
 
 if __FILE__ == $0
-  puts Stream.new(1) { Stream.new(2) { Stream.new(3) } }.to_a == [1, 2, 3]
+  puts lazy_stream(1) { lazy_stream(2) { lazy_stream } }.to_a == [1, 2]
+  puts lazy_stream(1) { lazy_stream(2) { lazy_stream(3) } }.to_a == [1, 2, 3]
 
   puts no_sevens.take(10).to_a == [1, 2, 3, 4, 5, 6, 8, 9, 10, 11]
   puts integers.take(10).reduce(&:+) == 55
-  puts Stream.add(integers.take(10), integers.take(10)).to_a ==
+  puts LazyStream.add(integers.take(10), integers.take(10)).to_a ==
        [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
   puts integers.take(10).to_a == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
   puts fibs.take(10).to_a == [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]

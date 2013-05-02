@@ -2,10 +2,10 @@
 
 require 'promise'
 
-class Stream
+class LazyStream
   def initialize(first=nil, &rest)
     @first = first
-    @rest = block_given? ? promise(&rest) : promise { Stream.new }
+    @rest = block_given? ? promise(&rest) : promise { LazyStream.new }
   end
 
   attr_reader :first, :rest
@@ -36,7 +36,7 @@ class Stream
   end
 
   def map(&proc)
-    empty? ? self : Stream.new(proc.call(first)) { rest.map(&proc) }
+    empty? ? self : LazyStream.new(proc.call(first)) { rest.map(&proc) }
   end
 
   def reduce(initial=0, &proc)
@@ -47,14 +47,15 @@ class Stream
     if empty?
       self
     elsif pred.call(first)
-      Stream.new(first) { rest.select(&pred) }
+      LazyStream.new(first) { rest.select(&pred) }
     else
       rest.select(&pred)
     end
   end
 
   def take(n)
-    empty? || n < 1 ? Stream.new : Stream.new(first) { rest.take(n - 1) }
+    empty? || n < 1 ? LazyStream.new :
+                      LazyStream.new(first) { rest.take(n - 1) }
   end
 
   def to_a
@@ -71,14 +72,14 @@ class Stream
 
   def partial_sums(initial=0)
     partial_sum = initial + first
-    Stream.new(partial_sum) { rest.partial_sums(partial_sum) }
+    LazyStream.new(partial_sum) { rest.partial_sums(partial_sum) }
   end
 
   def map_successive_pairs(&proc)
     if empty? || rest.empty?
-      Stream.new
+      LazyStream.new
     else
-      Stream.new(proc.call(first, rest.first)) do
+      LazyStream.new(proc.call(first, rest.first)) do
         rest.rest.map_successive_pairs(&proc)
       end
     end
@@ -86,9 +87,9 @@ class Stream
 
   def self.map(*streams, &proc)
     if streams.first.empty?
-      Stream.new
+      LazyStream.new
     else
-      Stream.new(proc.call(*streams.map(&:first))) do
+      LazyStream.new(proc.call(*streams.map(&:first))) do
         map(*streams.map(&:rest), &proc)
       end
     end
@@ -99,6 +100,12 @@ class Stream
   end
 
   def self.interleave(s1, s2)
-    s1.empty? ? s2 : Stream.new(s1.first) { interleave(s2, s1.rest) }
+    s1.empty? ? s2 : LazyStream.new(s1.first) { interleave(s2, s1.rest) }
+  end
+end
+
+module Kernel
+  def lazy_stream(first=nil, &rest)
+    LazyStream.new(first, &rest)
   end
 end
