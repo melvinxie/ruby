@@ -128,6 +128,8 @@ def monte_carlo_pi
 end
 
 if __FILE__ == $0
+  puts Stream.new(1) { Stream.new(2) { Stream.new(3) } }.to_a == [1, 2, 3]
+
   puts no_sevens.take(10).to_a == [1, 2, 3, 4, 5, 6, 8, 9, 10, 11]
   puts integers.take(10).reduce(&:+) == 55
   puts Stream.add(integers.take(10), integers.take(10)).to_a ==

@@ -5,7 +5,7 @@ require 'promise'
 class Stream
   def initialize(first=nil, &rest)
     @first = first
-    @rest = promise(&rest) if block_given?
+    @rest = block_given? ? promise(&rest) : promise { Stream.new }
   end
 
   attr_reader :first, :rest
