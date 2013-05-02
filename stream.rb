@@ -1,30 +1,14 @@
 #!/usr/bin/env ruby
 
-def memo_proc(&proc)
-  already_run = false
-  result = nil
-  lambda do
-    if already_run
-      result
-    else
-      result = proc.call
-      already_run = true
-      result
-    end
-  end
-end
+require 'promise'
 
 class Stream
   def initialize(first=nil, &rest)
     @first = first
-    @rest = block_given? ? memo_proc(&rest) : lambda {}
+    @rest = promise(&rest) if block_given?
   end
 
-  attr_reader :first
-
-  def rest
-    @rest.call
-  end
+  attr_reader :first, :rest
 
   def empty?
     first.nil?
@@ -40,16 +24,8 @@ class Stream
     end
   end
 
-  def display
-    each { |x| puts x }
-  end
-
   def drop(n)
-    if empty? or n < 1
-      self
-    else
-      rest.drop(n - 1)
-    end
+    empty? || n < 1 ? self : rest.drop(n - 1)
   end
 
   def each(&proc)
@@ -60,19 +36,11 @@ class Stream
   end
 
   def map(&proc)
-    if empty?
-      self
-    else
-      Stream.new(proc.call(first)) { rest.map(&proc) }
-    end
+    empty? ? self : Stream.new(proc.call(first)) { rest.map(&proc) }
   end
 
   def reduce(initial=0, &proc)
-    if empty?
-      initial
-    else
-      rest.reduce(proc.call(initial, first), &proc)
-    end
+    empty? ? initial : rest.reduce(proc.call(initial, first), &proc)
   end
 
   def select(&pred)
@@ -86,11 +54,15 @@ class Stream
   end
 
   def take(n)
-    if empty? or n < 1
-      Stream.new
-    else
-      Stream.new(first) { rest.take(n - 1) }
-    end
+    empty? || n < 1 ? Stream.new : Stream.new(first) { rest.take(n - 1) }
+  end
+
+  def to_a
+    reduce([]) { |a, x| a << x }
+  end
+
+  def print
+    each { |x| puts x }
   end
 
   def scale(factor)
@@ -100,6 +72,16 @@ class Stream
   def partial_sums(initial=0)
     partial_sum = initial + first
     Stream.new(partial_sum) { rest.partial_sums(partial_sum) }
+  end
+
+  def map_successive_pairs(&proc)
+    if empty? || rest.empty?
+      Stream.new
+    else
+      Stream.new(proc.call(first, rest.first)) do
+        rest.rest.map_successive_pairs(&proc)
+      end
+    end
   end
 
   def self.map(*streams, &proc)
@@ -117,10 +99,6 @@ class Stream
   end
 
   def self.interleave(s1, s2)
-    if s1.empty?
-      s2
-    else
-      Stream.new(s1.first) { interleave(s2, s1.rest) }
-    end
+    s1.empty? ? s2 : Stream.new(s1.first) { interleave(s2, s1.rest) }
   end
 end
