@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 
-require './lazy_stream'
+require 'lazy_stream'
+require 'promise'
 
 def enumerate_interval(low, high)
   low > high ? lazy_stream :
